@@ -13,6 +13,9 @@ export default {
       },
     },
     extend: {
+      fontFamily: {
+        pixel: ['"Press Start 2P"', 'cursive'],
+      },
       colors: {
         border: "hsl(var(--border))",
         input: "hsl(var(--input))",
@@ -57,6 +60,13 @@ export default {
           border: "hsl(var(--sidebar-border))",
           ring: "hsl(var(--sidebar-ring))",
         },
+        // Game colors
+        "player-red": "hsl(var(--player-red))",
+        "player-yellow": "hsl(var(--player-yellow))",
+        "board-blue": "hsl(var(--board-blue))",
+        "board-border": "hsl(var(--board-border))",
+        "cell-shadow": "hsl(var(--cell-shadow))",
+        "win-glow": "hsl(var(--win-glow))",
       },
       borderRadius: {
         lg: "var(--radius)",
