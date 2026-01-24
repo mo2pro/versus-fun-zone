@@ -266,69 +266,34 @@ export const useMultiplayerGame = () => {
 
     const roomCode = code.toUpperCase().trim();
 
+    // Use the secure database function to join the room (prevents race conditions)
     const { data, error } = await supabase
-      .from('game_rooms')
-      .select()
-      .eq('room_code', roomCode)
-      .maybeSingle();
+      .rpc('join_game_room', { p_room_code: roomCode });
 
-    if (error || !data) {
+    if (error) {
+      // Parse the error message from the database function
+      const errorMessage = error.message.includes('Room not found') 
+        ? 'Room not found'
+        : error.message.includes('Room is full')
+        ? 'Room is full'
+        : 'Failed to join room: ' + error.message;
+      setState(prev => ({ ...prev, error: errorMessage }));
+      return false;
+    }
+
+    if (!data) {
       setState(prev => ({ ...prev, error: 'Room not found' }));
       return false;
     }
 
-    if (data.guest_id && data.guest_id !== state.playerId) {
-      setState(prev => ({ ...prev, error: 'Room is full' }));
-      return false;
-    }
-
-    if (data.host_id === state.playerId) {
-      // Rejoining as host
-      const room: GameRoom = {
-        id: data.id,
-        room_code: data.room_code,
-        host_id: data.host_id,
-        guest_id: data.guest_id,
-        board: data.board as Board,
-        current_player: data.current_player as Player,
-        winner: data.winner as Player | null,
-        is_draw: data.is_draw,
-        winning_cells: data.winning_cells as unknown as WinningCells | null,
-        last_move: data.last_move as unknown as { row: number; col: number } | null,
-        scores: data.scores as { player1: number; player2: number },
-        status: data.status as 'waiting' | 'playing' | 'finished',
-      };
-
-      setState(prev => ({
-        ...prev,
-        room,
-        playerNumber: 1,
-        isConnected: true,
-      }));
-
-      subscribeToRoom(data.id);
-      return true;
-    }
-
-    // Join as guest
-    const { error: updateError } = await supabase
-      .from('game_rooms')
-      .update({
-        guest_id: state.playerId,
-        status: 'playing',
-      })
-      .eq('id', data.id);
-
-    if (updateError) {
-      setState(prev => ({ ...prev, error: 'Failed to join room: ' + updateError.message }));
-      return false;
-    }
-
+    // Determine player number based on host/guest status
+    const isHost = data.host_id === state.playerId;
+    
     const room: GameRoom = {
       id: data.id,
       room_code: data.room_code,
       host_id: data.host_id,
-      guest_id: state.playerId,
+      guest_id: data.guest_id,
       board: data.board as Board,
       current_player: data.current_player as Player,
       winner: data.winner as Player | null,
@@ -336,13 +301,13 @@ export const useMultiplayerGame = () => {
       winning_cells: data.winning_cells as unknown as WinningCells | null,
       last_move: data.last_move as unknown as { row: number; col: number } | null,
       scores: data.scores as { player1: number; player2: number },
-      status: 'playing',
+      status: data.status as 'waiting' | 'playing' | 'finished',
     };
 
     setState(prev => ({
       ...prev,
       room,
-      playerNumber: 2,
+      playerNumber: isHost ? 1 : 2,
       isConnected: true,
     }));
 
@@ -356,71 +321,44 @@ export const useMultiplayerGame = () => {
     if (state.room.current_player !== state.playerNumber) return;
     if (state.room.status !== 'playing') return;
 
-    const board = state.room.board.map(row => [...row]) as Board;
+    // Use the secure database function to make the move (server-side validation)
+    const { error } = await supabase
+      .rpc('make_move', { 
+        p_room_id: state.room.id, 
+        p_column: col 
+      });
 
-    // Find lowest empty row
-    let targetRow = -1;
-    for (let row = ROWS - 1; row >= 0; row--) {
-      if (board[row][col] === null) {
-        targetRow = row;
-        break;
-      }
+    if (error) {
+      console.error('Move failed:', error.message);
+      // The realtime subscription will update the state if the move was actually made
     }
-
-    if (targetRow === -1) return;
-
-    board[targetRow][col] = state.room.current_player;
-
-    const winningCells = checkWinner(board, state.room.current_player);
-    const winner = winningCells ? state.room.current_player : null;
-    const isDraw = !winner && checkDraw(board);
-
-    const newScores = { ...state.room.scores };
-    if (winner === 1) newScores.player1++;
-    if (winner === 2) newScores.player2++;
-
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    await supabase
-      .from('game_rooms')
-      .update({
-        board: board as any,
-        current_player: winner || isDraw ? state.room.current_player : (state.room.current_player === 1 ? 2 : 1),
-        winner,
-        is_draw: isDraw,
-        winning_cells: winningCells as any,
-        last_move: { row: targetRow, col } as any,
-        scores: newScores as any,
-        status: winner || isDraw ? 'finished' : 'playing',
-      })
-      .eq('id', state.room.id);
+    // State will be updated via realtime subscription
   }, [state.room, state.playerNumber]);
 
   const resetGame = useCallback(async () => {
     if (!state.room) return;
 
-    await supabase
-      .from('game_rooms')
-      .update({
-        board: createEmptyBoard(),
-        current_player: 1,
-        winner: null,
-        is_draw: false,
-        winning_cells: null,
-        last_move: null,
-        status: 'playing',
-      })
-      .eq('id', state.room.id);
+    // Use the secure database function to reset the game
+    const { error } = await supabase
+      .rpc('reset_game', { p_room_id: state.room.id });
+
+    if (error) {
+      console.error('Reset game failed:', error.message);
+    }
+    // State will be updated via realtime subscription
   }, [state.room]);
 
   const resetScores = useCallback(async () => {
     if (!state.room) return;
 
-    await supabase
-      .from('game_rooms')
-      .update({
-        scores: { player1: 0, player2: 0 },
-      })
-      .eq('id', state.room.id);
+    // Use the secure database function to reset scores
+    const { error } = await supabase
+      .rpc('reset_scores', { p_room_id: state.room.id });
+
+    if (error) {
+      console.error('Reset scores failed:', error.message);
+    }
+    // State will be updated via realtime subscription
   }, [state.room]);
 
   const leaveRoom = useCallback(() => {
