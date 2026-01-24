@@ -70,7 +70,106 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      join_game_room: {
+        Args: { p_room_code: string }
+        Returns: {
+          board: Json
+          created_at: string
+          current_player: number
+          guest_id: string | null
+          host_id: string
+          id: string
+          is_draw: boolean
+          last_move: Json | null
+          room_code: string
+          scores: Json
+          status: string
+          updated_at: string
+          winner: number | null
+          winning_cells: Json | null
+        }
+        SetofOptions: {
+          from: "*"
+          to: "game_rooms"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      make_move: {
+        Args: { p_column: number; p_room_id: string }
+        Returns: {
+          board: Json
+          created_at: string
+          current_player: number
+          guest_id: string | null
+          host_id: string
+          id: string
+          is_draw: boolean
+          last_move: Json | null
+          room_code: string
+          scores: Json
+          status: string
+          updated_at: string
+          winner: number | null
+          winning_cells: Json | null
+        }
+        SetofOptions: {
+          from: "*"
+          to: "game_rooms"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      reset_game: {
+        Args: { p_room_id: string }
+        Returns: {
+          board: Json
+          created_at: string
+          current_player: number
+          guest_id: string | null
+          host_id: string
+          id: string
+          is_draw: boolean
+          last_move: Json | null
+          room_code: string
+          scores: Json
+          status: string
+          updated_at: string
+          winner: number | null
+          winning_cells: Json | null
+        }
+        SetofOptions: {
+          from: "*"
+          to: "game_rooms"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      reset_scores: {
+        Args: { p_room_id: string }
+        Returns: {
+          board: Json
+          created_at: string
+          current_player: number
+          guest_id: string | null
+          host_id: string
+          id: string
+          is_draw: boolean
+          last_move: Json | null
+          room_code: string
+          scores: Json
+          status: string
+          updated_at: string
+          winner: number | null
+          winning_cells: Json | null
+        }
+        SetofOptions: {
+          from: "*"
+          to: "game_rooms"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
     }
     Enums: {
       [_ in never]: never
