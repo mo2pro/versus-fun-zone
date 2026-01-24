@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { supabase } from '@/integrations/supabase/client';
-import type { Board, Player, Cell } from './useConnectFour';
+import type { Board, Player } from './useConnectFour';
 
 const ROWS = 6;
 const COLS = 7;
@@ -27,10 +27,11 @@ interface GameRoom {
 
 interface MultiplayerState {
   room: GameRoom | null;
-  playerId: string;
+  playerId: string | null;
   playerNumber: Player | null;
   isConnected: boolean;
   error: string | null;
+  isAuthenticating: boolean;
 }
 
 const generateRoomCode = (): string => {
@@ -40,14 +41,6 @@ const generateRoomCode = (): string => {
     code += chars.charAt(Math.floor(Math.random() * chars.length));
   }
   return code;
-};
-
-const generatePlayerId = (): string => {
-  const stored = localStorage.getItem('connect4_player_id');
-  if (stored) return stored;
-  const id = crypto.randomUUID();
-  localStorage.setItem('connect4_player_id', id);
-  return id;
 };
 
 const createEmptyBoard = (): Board => {
@@ -103,16 +96,68 @@ const checkDraw = (board: Board): boolean => {
   return board[0].every(cell => cell !== null);
 };
 
+// Ensure user is authenticated (anonymous auth for game players)
+const ensureAuth = async (): Promise<string> => {
+  const { data: { user } } = await supabase.auth.getUser();
+  
+  if (user) {
+    return user.id;
+  }
+  
+  // Sign in anonymously if not authenticated
+  const { data, error } = await supabase.auth.signInAnonymously();
+  if (error) {
+    throw new Error('Failed to authenticate: ' + error.message);
+  }
+  
+  if (!data.user) {
+    throw new Error('Failed to get user after authentication');
+  }
+  
+  return data.user.id;
+};
+
 export const useMultiplayerGame = () => {
   const [state, setState] = useState<MultiplayerState>({
     room: null,
-    playerId: generatePlayerId(),
+    playerId: null,
     playerNumber: null,
     isConnected: false,
     error: null,
+    isAuthenticating: false,
   });
 
   const channelRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
+
+  // Initialize authentication on mount
+  useEffect(() => {
+    const initAuth = async () => {
+      setState(prev => ({ ...prev, isAuthenticating: true }));
+      try {
+        const userId = await ensureAuth();
+        setState(prev => ({ ...prev, playerId: userId, isAuthenticating: false }));
+      } catch (error) {
+        setState(prev => ({ 
+          ...prev, 
+          error: 'Failed to initialize authentication', 
+          isAuthenticating: false 
+        }));
+      }
+    };
+
+    initAuth();
+
+    // Listen for auth state changes
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+      if (session?.user) {
+        setState(prev => ({ ...prev, playerId: session.user.id }));
+      }
+    });
+
+    return () => {
+      subscription.unsubscribe();
+    };
+  }, []);
 
   const subscribeToRoom = useCallback((roomId: string) => {
     if (channelRef.current) {
@@ -158,6 +203,11 @@ export const useMultiplayerGame = () => {
   }, []);
 
   const createRoom = useCallback(async () => {
+    if (!state.playerId) {
+      setState(prev => ({ ...prev, error: 'Not authenticated' }));
+      return null;
+    }
+
     setState(prev => ({ ...prev, error: null }));
 
     const roomCode = generateRoomCode();
@@ -176,7 +226,7 @@ export const useMultiplayerGame = () => {
       .single();
 
     if (error) {
-      setState(prev => ({ ...prev, error: 'Failed to create room' }));
+      setState(prev => ({ ...prev, error: 'Failed to create room: ' + error.message }));
       return null;
     }
 
@@ -207,6 +257,11 @@ export const useMultiplayerGame = () => {
   }, [state.playerId, subscribeToRoom]);
 
   const joinRoom = useCallback(async (code: string) => {
+    if (!state.playerId) {
+      setState(prev => ({ ...prev, error: 'Not authenticated' }));
+      return false;
+    }
+
     setState(prev => ({ ...prev, error: null }));
 
     const roomCode = code.toUpperCase().trim();
@@ -265,7 +320,7 @@ export const useMultiplayerGame = () => {
       .eq('id', data.id);
 
     if (updateError) {
-      setState(prev => ({ ...prev, error: 'Failed to join room' }));
+      setState(prev => ({ ...prev, error: 'Failed to join room: ' + updateError.message }));
       return false;
     }
 
@@ -374,14 +429,14 @@ export const useMultiplayerGame = () => {
       channelRef.current = null;
     }
 
-    setState({
+    setState(prev => ({
+      ...prev,
       room: null,
-      playerId: state.playerId,
       playerNumber: null,
       isConnected: false,
       error: null,
-    });
-  }, [state.playerId]);
+    }));
+  }, []);
 
   const isColumnFull = useCallback((col: number) => {
     if (!state.room) return true;
@@ -414,6 +469,7 @@ export const useMultiplayerGame = () => {
     isConnected: state.isConnected,
     error: state.error,
     isMyTurn,
+    isAuthenticating: state.isAuthenticating,
     createRoom,
     joinRoom,
     dropDisc,

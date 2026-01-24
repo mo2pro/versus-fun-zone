@@ -8,6 +8,7 @@ interface MultiplayerLobbyProps {
   onJoinRoom: (code: string) => Promise<boolean>;
   onBack: () => void;
   error: string | null;
+  isAuthenticating?: boolean;
 }
 
 export const MultiplayerLobby = ({
@@ -15,6 +16,7 @@ export const MultiplayerLobby = ({
   onJoinRoom,
   onBack,
   error,
+  isAuthenticating = false,
 }: MultiplayerLobbyProps) => {
   const [mode, setMode] = useState<'menu' | 'create' | 'join'>('menu');
   const [roomCode, setRoomCode] = useState('');
@@ -43,6 +45,19 @@ export const MultiplayerLobby = ({
       navigator.clipboard.writeText(createdCode);
     }
   };
+
+  if (isAuthenticating) {
+    return (
+      <div className="text-center space-y-6">
+        <h1 className="text-lg sm:text-2xl text-primary retro-glow tracking-wider">
+          ONLINE MULTIPLAYER
+        </h1>
+        <p className="text-[10px] sm:text-xs text-secondary animate-blink">
+          CONNECTING...
+        </p>
+      </div>
+    );
+  }
 
   return (
     <div className="text-center space-y-6">
