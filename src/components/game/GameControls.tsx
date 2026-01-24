@@ -1,13 +1,15 @@
 import { Button } from "@/components/ui/button";
-import { RotateCcw, Trophy } from "lucide-react";
+import { RotateCcw, Trophy, ArrowLeft } from "lucide-react";
 
 interface GameControlsProps {
   onNewGame: () => void;
   onResetScores: () => void;
   gameOver: boolean;
+  onBack?: () => void;
+  showBack?: boolean;
 }
 
-export const GameControls = ({ onNewGame, onResetScores, gameOver }: GameControlsProps) => {
+export const GameControls = ({ onNewGame, onResetScores, gameOver, onBack, showBack }: GameControlsProps) => {
   return (
     <div className="flex flex-col sm:flex-row gap-3 sm:gap-4 justify-center">
       <Button
@@ -26,6 +28,17 @@ export const GameControls = ({ onNewGame, onResetScores, gameOver }: GameControl
         <Trophy className="w-3 h-3 sm:w-4 sm:h-4 mr-2" />
         RESET SCORES
       </Button>
+
+      {showBack && onBack && (
+        <Button
+          onClick={onBack}
+          variant="outline"
+          className="pixel-button border-border text-muted-foreground hover:text-foreground text-[10px] sm:text-xs px-4 py-3 sm:px-6 sm:py-4"
+        >
+          <ArrowLeft className="w-3 h-3 sm:w-4 sm:h-4 mr-2" />
+          BACK TO MENU
+        </Button>
+      )}
     </div>
   );
 };
