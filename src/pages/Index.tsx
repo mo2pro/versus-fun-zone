@@ -110,6 +110,7 @@ const Index = () => {
             onJoinRoom={handleJoinRoom}
             onBack={handleBackToMenu}
             error={multiplayer.error}
+            isAuthenticating={multiplayer.isAuthenticating}
           />
         )}
 
