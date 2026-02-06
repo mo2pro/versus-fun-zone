@@ -8,7 +8,7 @@ interface GameModeSelectProps {
 export const GameModeSelect = ({ onSelectLocal, onSelectOnline }: GameModeSelectProps) => {
   return (
     <div className="text-center space-y-8">
-      <h1 className="text-lg sm:text-2xl md:text-3xl text-primary retro-glow tracking-wider">
+      <h1 className="text-lg sm:text-2xl md:text-3xl text-player-red retro-glow tracking-wider">
         CONNECT FOUR
       </h1>
       
